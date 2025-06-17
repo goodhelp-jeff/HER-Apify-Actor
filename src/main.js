@@ -5,15 +5,12 @@ Actor.main(async () => {
     // Get input configuration
     const input = await Actor.getInput() || {};
     const {
-        startUrls = [{ url: 'https://www.hershenberggroup.com/team/brandon-hooley' }],
+        targetUrl = 'https://www.hershenberggroup.com/team/brandon-hooley',
         maxRetries = 3,
         scrollDelay = 1500,
         useProxy = true,
         proxyConfiguration
     } = input;
-
-    // Extract the URL from the startUrls array
-    const targetUrl = startUrls[0]?.url || 'https://www.hershenberggroup.com/team/brandon-hooley';
 
     log.info('Starting Hershenberg Group listings scraper', { targetUrl });
 
@@ -152,7 +149,7 @@ Actor.main(async () => {
             'div:has-text("ALL LISTINGS")',
             '[class*="tab"]:has-text("ALL LISTINGS")',
             '[role="tab"]:has-text("ALL LISTINGS")',
-            '//\*[contains(text(), "ALL LISTINGS")]',
+            '//*[contains(text(), "ALL LISTINGS")]',
             '//a[contains(text(), "ALL LISTINGS")]',
             '//div[contains(text(), "ALL LISTINGS")]'
         ];
@@ -331,514 +328,14 @@ Actor.main(async () => {
                 allElements.forEach(element => {
                     const text = element.textContent;
                     // Check if element contains listing-like content
-                    if (text.includes('$') &&
-            
-            let listingElements = [];
-            for (const selector of listingSelectors) {
-                const elements = document.querySelectorAll(selector);
-                if (elements.length > 0) {
-                    listingElements = elements;
-                    break;
-                }
-            }
-            
-            const results = [];
-            
-            listingElements.forEach((listing) => {
-                try {
-                    // Extract title/address - based on the screenshot structure
-                    let title = '';
-                    const titleSelectors = [
-                        'h3',
-                        'h4',
-                        '[class*="address"]',
-                        '[class*="title"]',
-                        '[class*="street"]',
-                        'a[href*="property"]',
-                        'a[href*="listing"]'
-                    ];
-                    
-                    for (const selector of titleSelectors) {
-                        const element = listing.querySelector(selector);
-                        if (element && element.textContent.trim()) {
-                            // Check if it contains an address pattern (numbers + text)
-                            const text = element.textContent.trim();
-                            if (text.match(/^\d+\s+\w+/) || text.length > 5) {
-                                title = text;
-                                break;
-                            }
-                        }
-                    }
-
-                    // Extract price - clearly visible in the screenshot
-                    let price = '';
-                    const priceSelectors = [
-                        ':has-text("$")',
-                        '[class*="price"]',
-                        'div:has-text("$")',
-                        'span:has-text("$")',
-                        'p:has-text("$")'
-                    ];
-                    
-                    for (const selector of priceSelectors) {
-                        try {
-                            const elements = listing.querySelectorAll('*');
-                            for (const el of elements) {
-                                if (el.textContent.includes('
-
-                    // Extract images
-                    const imageElements = listing.querySelectorAll('img[src], img[data-src], img[data-lazy-src]');
-                    const images = Array.from(imageElements)
-                        .map(img => img.src || img.dataset.src || img.dataset.lazySrc)
-                        .filter(src => src && !src.includes('placeholder') && !src.includes('logo'))
-                        .slice(0, 5);
-
-                    // Extract listing URL
-                    const linkElement = listing.querySelector('a[href]');
-                    let listingUrl = '';
-                    if (linkElement) {
-                        listingUrl = linkElement.href;
-                        // Make URL absolute if needed
-                        if (listingUrl.startsWith('/')) {
-                            listingUrl = window.location.origin + listingUrl;
-                        }
-                    }
-
-                    // Only add if we have meaningful data
-                    if (title && (price || sqft || beds)) {
-                        results.push({
-                            title,
-                            price: price || 'Contact for price',
-                            sqft: sqft || 'N/A',
-                            beds,
-                            baths,
-                            images,
-                            listingUrl,
-                            agent: 'Brandon Hooley',
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error extracting listing:', error);
-                }
-            });
-
-            return results;
-        });
-
-        log.info(`Extracted ${listings.length} listings`);
-
-        // Store results in dataset
-        if (listings.length > 0) {
-            await Actor.pushData(listings);
-            log.info('Successfully stored listings in dataset');
-        } else {
-            log.warning('No listings found - page structure may have changed');
-            
-            // Take screenshot for debugging
-            const screenshot = await page.screenshot({ fullPage: true });
-            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
-            log.info('Saved debug screenshot to key-value store');
-            
-            // Also save the page HTML for debugging
-            const html = await page.content();
-            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
-            log.info('Saved page HTML to key-value store');
-        }
-
-    } catch (error) {
-        log.error('Error during scraping:', error);
-        throw error;
-    } finally {
-        await browser.close();
-    }
-});
-
-/**
- * Get random user agent for anti-detection
- * @returns {string} - Random user agent string
- */
-function getRandomUserAgent() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-}) && el.textContent.match(/\$[\d,]+/)) {
-                                    price = el.textContent.trim();
-                                    break;
-                                }
-                            }
-                            if (price) break;
-                        } catch (e) {}
-                    }
-
-                    // Extract square footage - visible as "SQFT" in the screenshot
-                    let sqft = '';
-                    const sqftElement = listing.querySelector(':has-text("SQFT")');
-                    if (sqftElement) {
-                        const match = sqftElement.textContent.match(/([\d,]+)\s*SQFT/i);
-                        if (match) sqft = match[1];
-                    }
-
-                    // Extract bedrooms - visible as "BEDS" in the screenshot
-                    let beds = 0;
-                    const bedsElement = listing.querySelector(':has-text("BEDS")');
-                    if (bedsElement) {
-                        const match = bedsElement.textContent.match(/(\d+)\s*BEDS/i);
-                        if (match) beds = parseInt(match[1]);
-                    }
-
-                    // Extract bathrooms - visible as "BATHS" in the screenshot
-                    let baths = 0;
-                    const bathsElement = listing.querySelector(':has-text("BATHS")');
-                    if (bathsElement) {
-                        const match = bathsElement.textContent.match(/([\d.]+)\s*BATHS/i);
-                        if (match) baths = parseFloat(match[1]);
-                    }
-
-                    // Extract images
-                    const imageElements = listing.querySelectorAll('img[src], img[data-src], img[data-lazy-src]');
-                    const images = Array.from(imageElements)
-                        .map(img => img.src || img.dataset.src || img.dataset.lazySrc)
-                        .filter(src => src && !src.includes('placeholder') && !src.includes('logo'))
-                        .slice(0, 5);
-
-                    // Extract listing URL
-                    const linkElement = listing.querySelector('a[href]');
-                    let listingUrl = '';
-                    if (linkElement) {
-                        listingUrl = linkElement.href;
-                        // Make URL absolute if needed
-                        if (listingUrl.startsWith('/')) {
-                            listingUrl = window.location.origin + listingUrl;
-                        }
-                    }
-
-                    // Only add if we have meaningful data
-                    if (title && (price || sqft || beds)) {
-                        results.push({
-                            title,
-                            price: price || 'Contact for price',
-                            sqft: sqft || 'N/A',
-                            beds,
-                            baths,
-                            images,
-                            listingUrl,
-                            agent: 'Brandon Hooley',
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error extracting listing:', error);
-                }
-            });
-
-            return results;
-        });
-
-        log.info(`Extracted ${listings.length} listings`);
-
-        // Store results in dataset
-        if (listings.length > 0) {
-            await Actor.pushData(listings);
-            log.info('Successfully stored listings in dataset');
-        } else {
-            log.warning('No listings found - page structure may have changed');
-            
-            // Take screenshot for debugging
-            const screenshot = await page.screenshot({ fullPage: true });
-            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
-            log.info('Saved debug screenshot to key-value store');
-            
-            // Also save the page HTML for debugging
-            const html = await page.content();
-            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
-            log.info('Saved page HTML to key-value store');
-        }
-
-    } catch (error) {
-        log.error('Error during scraping:', error);
-        throw error;
-    } finally {
-        await browser.close();
-    }
-});
-
-/**
- * Get random user agent for anti-detection
- * @returns {string} - Random user agent string
- */
-function getRandomUserAgent() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-}) && 
+                    if (text.includes('$') && 
                         (text.includes('SQFT') || text.includes('BEDS') || text.includes('BATHS')) &&
                         text.match(/\d+\s+\w+/)) { // Address pattern
                         
                         // Check if this isn't a parent of another listing
                         const hasChildListing = Array.from(element.querySelectorAll('*')).some(child => {
                             const childText = child.textContent;
-                            return childText.includes('
-            
-            let listingElements = [];
-            for (const selector of listingSelectors) {
-                const elements = document.querySelectorAll(selector);
-                if (elements.length > 0) {
-                    listingElements = elements;
-                    break;
-                }
-            }
-            
-            const results = [];
-            
-            listingElements.forEach((listing) => {
-                try {
-                    // Extract title/address - based on the screenshot structure
-                    let title = '';
-                    const titleSelectors = [
-                        'h3',
-                        'h4',
-                        '[class*="address"]',
-                        '[class*="title"]',
-                        '[class*="street"]',
-                        'a[href*="property"]',
-                        'a[href*="listing"]'
-                    ];
-                    
-                    for (const selector of titleSelectors) {
-                        const element = listing.querySelector(selector);
-                        if (element && element.textContent.trim()) {
-                            // Check if it contains an address pattern (numbers + text)
-                            const text = element.textContent.trim();
-                            if (text.match(/^\d+\s+\w+/) || text.length > 5) {
-                                title = text;
-                                break;
-                            }
-                        }
-                    }
-
-                    // Extract price - clearly visible in the screenshot
-                    let price = '';
-                    const priceSelectors = [
-                        ':has-text("$")',
-                        '[class*="price"]',
-                        'div:has-text("$")',
-                        'span:has-text("$")',
-                        'p:has-text("$")'
-                    ];
-                    
-                    for (const selector of priceSelectors) {
-                        try {
-                            const elements = listing.querySelectorAll('*');
-                            for (const el of elements) {
-                                if (el.textContent.includes('
-
-                    // Extract images
-                    const imageElements = listing.querySelectorAll('img[src], img[data-src], img[data-lazy-src]');
-                    const images = Array.from(imageElements)
-                        .map(img => img.src || img.dataset.src || img.dataset.lazySrc)
-                        .filter(src => src && !src.includes('placeholder') && !src.includes('logo'))
-                        .slice(0, 5);
-
-                    // Extract listing URL
-                    const linkElement = listing.querySelector('a[href]');
-                    let listingUrl = '';
-                    if (linkElement) {
-                        listingUrl = linkElement.href;
-                        // Make URL absolute if needed
-                        if (listingUrl.startsWith('/')) {
-                            listingUrl = window.location.origin + listingUrl;
-                        }
-                    }
-
-                    // Only add if we have meaningful data
-                    if (title && (price || sqft || beds)) {
-                        results.push({
-                            title,
-                            price: price || 'Contact for price',
-                            sqft: sqft || 'N/A',
-                            beds,
-                            baths,
-                            images,
-                            listingUrl,
-                            agent: 'Brandon Hooley',
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error extracting listing:', error);
-                }
-            });
-
-            return results;
-        });
-
-        log.info(`Extracted ${listings.length} listings`);
-
-        // Store results in dataset
-        if (listings.length > 0) {
-            await Actor.pushData(listings);
-            log.info('Successfully stored listings in dataset');
-        } else {
-            log.warning('No listings found - page structure may have changed');
-            
-            // Take screenshot for debugging
-            const screenshot = await page.screenshot({ fullPage: true });
-            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
-            log.info('Saved debug screenshot to key-value store');
-            
-            // Also save the page HTML for debugging
-            const html = await page.content();
-            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
-            log.info('Saved page HTML to key-value store');
-        }
-
-    } catch (error) {
-        log.error('Error during scraping:', error);
-        throw error;
-    } finally {
-        await browser.close();
-    }
-});
-
-/**
- * Get random user agent for anti-detection
- * @returns {string} - Random user agent string
- */
-function getRandomUserAgent() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-}) && el.textContent.match(/\$[\d,]+/)) {
-                                    price = el.textContent.trim();
-                                    break;
-                                }
-                            }
-                            if (price) break;
-                        } catch (e) {}
-                    }
-
-                    // Extract square footage - visible as "SQFT" in the screenshot
-                    let sqft = '';
-                    const sqftElement = listing.querySelector(':has-text("SQFT")');
-                    if (sqftElement) {
-                        const match = sqftElement.textContent.match(/([\d,]+)\s*SQFT/i);
-                        if (match) sqft = match[1];
-                    }
-
-                    // Extract bedrooms - visible as "BEDS" in the screenshot
-                    let beds = 0;
-                    const bedsElement = listing.querySelector(':has-text("BEDS")');
-                    if (bedsElement) {
-                        const match = bedsElement.textContent.match(/(\d+)\s*BEDS/i);
-                        if (match) beds = parseInt(match[1]);
-                    }
-
-                    // Extract bathrooms - visible as "BATHS" in the screenshot
-                    let baths = 0;
-                    const bathsElement = listing.querySelector(':has-text("BATHS")');
-                    if (bathsElement) {
-                        const match = bathsElement.textContent.match(/([\d.]+)\s*BATHS/i);
-                        if (match) baths = parseFloat(match[1]);
-                    }
-
-                    // Extract images
-                    const imageElements = listing.querySelectorAll('img[src], img[data-src], img[data-lazy-src]');
-                    const images = Array.from(imageElements)
-                        .map(img => img.src || img.dataset.src || img.dataset.lazySrc)
-                        .filter(src => src && !src.includes('placeholder') && !src.includes('logo'))
-                        .slice(0, 5);
-
-                    // Extract listing URL
-                    const linkElement = listing.querySelector('a[href]');
-                    let listingUrl = '';
-                    if (linkElement) {
-                        listingUrl = linkElement.href;
-                        // Make URL absolute if needed
-                        if (listingUrl.startsWith('/')) {
-                            listingUrl = window.location.origin + listingUrl;
-                        }
-                    }
-
-                    // Only add if we have meaningful data
-                    if (title && (price || sqft || beds)) {
-                        results.push({
-                            title,
-                            price: price || 'Contact for price',
-                            sqft: sqft || 'N/A',
-                            beds,
-                            baths,
-                            images,
-                            listingUrl,
-                            agent: 'Brandon Hooley',
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error extracting listing:', error);
-                }
-            });
-
-            return results;
-        });
-
-        log.info(`Extracted ${listings.length} listings`);
-
-        // Store results in dataset
-        if (listings.length > 0) {
-            await Actor.pushData(listings);
-            log.info('Successfully stored listings in dataset');
-        } else {
-            log.warning('No listings found - page structure may have changed');
-            
-            // Take screenshot for debugging
-            const screenshot = await page.screenshot({ fullPage: true });
-            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
-            log.info('Saved debug screenshot to key-value store');
-            
-            // Also save the page HTML for debugging
-            const html = await page.content();
-            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
-            log.info('Saved page HTML to key-value store');
-        }
-
-    } catch (error) {
-        log.error('Error during scraping:', error);
-        throw error;
-    } finally {
-        await browser.close();
-    }
-});
-
-/**
- * Get random user agent for anti-detection
- * @returns {string} - Random user agent string
- */
-function getRandomUserAgent() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-}) && childText.includes('SQFT');
+                            return childText.includes('$') && childText.includes('SQFT');
                         });
                         
                         if (!hasChildListing) {
@@ -851,15 +348,6 @@ function getRandomUserAgent() {
                 console.log(`Found ${listingElements.length} potential listings using general approach`);
             }
             
-            let listingElements = [];
-            for (const selector of listingSelectors) {
-                const elements = document.querySelectorAll(selector);
-                if (elements.length > 0) {
-                    listingElements = elements;
-                    break;
-                }
-            }
-            
             const results = [];
             
             listingElements.forEach((listing) => {
@@ -890,113 +378,20 @@ function getRandomUserAgent() {
 
                     // Extract price - clearly visible in the screenshot
                     let price = '';
-                    const priceSelectors = [
-                        ':has-text("$")',
-                        '[class*="price"]',
-                        'div:has-text("$")',
-                        'span:has-text("$")',
-                        'p:has-text("$")'
-                    ];
-                    
-                    for (const selector of priceSelectors) {
-                        try {
-                            const elements = listing.querySelectorAll('*');
-                            for (const el of elements) {
-                                if (el.textContent.includes('
-
-                    // Extract images
-                    const imageElements = listing.querySelectorAll('img[src], img[data-src], img[data-lazy-src]');
-                    const images = Array.from(imageElements)
-                        .map(img => img.src || img.dataset.src || img.dataset.lazySrc)
-                        .filter(src => src && !src.includes('placeholder') && !src.includes('logo'))
-                        .slice(0, 5);
-
-                    // Extract listing URL
-                    const linkElement = listing.querySelector('a[href]');
-                    let listingUrl = '';
-                    if (linkElement) {
-                        listingUrl = linkElement.href;
-                        // Make URL absolute if needed
-                        if (listingUrl.startsWith('/')) {
-                            listingUrl = window.location.origin + listingUrl;
+                    const priceElements = listing.querySelectorAll('*');
+                    for (const el of priceElements) {
+                        const text = el.textContent || '';
+                        if (text.includes('$') && text.match(/\$[\d,]+/)) {
+                            price = el.textContent.trim();
+                            break;
                         }
-                    }
-
-                    // Only add if we have meaningful data
-                    if (title && (price || sqft || beds)) {
-                        results.push({
-                            title,
-                            price: price || 'Contact for price',
-                            sqft: sqft || 'N/A',
-                            beds,
-                            baths,
-                            images,
-                            listingUrl,
-                            agent: 'Brandon Hooley',
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error extracting listing:', error);
-                }
-            });
-
-            return results;
-        });
-
-        log.info(`Extracted ${listings.length} listings`);
-
-        // Store results in dataset
-        if (listings.length > 0) {
-            await Actor.pushData(listings);
-            log.info('Successfully stored listings in dataset');
-        } else {
-            log.warning('No listings found - page structure may have changed');
-            
-            // Take screenshot for debugging
-            const screenshot = await page.screenshot({ fullPage: true });
-            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
-            log.info('Saved debug screenshot to key-value store');
-            
-            // Also save the page HTML for debugging
-            const html = await page.content();
-            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
-            log.info('Saved page HTML to key-value store');
-        }
-
-    } catch (error) {
-        log.error('Error during scraping:', error);
-        throw error;
-    } finally {
-        await browser.close();
-    }
-});
-
-/**
- * Get random user agent for anti-detection
- * @returns {string} - Random user agent string
- */
-function getRandomUserAgent() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-}) && el.textContent.match(/\$[\d,]+/)) {
-                                    price = el.textContent.trim();
-                                    break;
-                                }
-                            }
-                            if (price) break;
-                        } catch (e) {}
                     }
 
                     // Extract square footage - visible as "SQFT" in the screenshot
                     let sqft = '';
-                    const sqftElement = listing.querySelector(':has-text("SQFT")');
+                    const sqftElement = Array.from(listing.querySelectorAll('*')).find(el => 
+                        el.textContent.includes('SQFT')
+                    );
                     if (sqftElement) {
                         const match = sqftElement.textContent.match(/([\d,]+)\s*SQFT/i);
                         if (match) sqft = match[1];
@@ -1004,7 +399,9 @@ function getRandomUserAgent() {
 
                     // Extract bedrooms - visible as "BEDS" in the screenshot
                     let beds = 0;
-                    const bedsElement = listing.querySelector(':has-text("BEDS")');
+                    const bedsElement = Array.from(listing.querySelectorAll('*')).find(el => 
+                        el.textContent.includes('BEDS')
+                    );
                     if (bedsElement) {
                         const match = bedsElement.textContent.match(/(\d+)\s*BEDS/i);
                         if (match) beds = parseInt(match[1]);
@@ -1012,7 +409,9 @@ function getRandomUserAgent() {
 
                     // Extract bathrooms - visible as "BATHS" in the screenshot
                     let baths = 0;
-                    const bathsElement = listing.querySelector(':has-text("BATHS")');
+                    const bathsElement = Array.from(listing.querySelectorAll('*')).find(el => 
+                        el.textContent.includes('BATHS')
+                    );
                     if (bathsElement) {
                         const match = bathsElement.textContent.match(/([\d.]+)\s*BATHS/i);
                         if (match) baths = parseFloat(match[1]);
