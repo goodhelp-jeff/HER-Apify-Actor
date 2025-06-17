@@ -331,7 +331,7 @@ Actor.main(async () => {
                 allElements.forEach(element => {
                     const text = element.textContent;
                     // Check if element contains listing-like content
-                    if (text.includes('
+                    if (text.includes('$') &&
             
             let listingElements = [];
             for (const selector of listingSelectors) {
