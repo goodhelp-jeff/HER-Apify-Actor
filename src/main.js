@@ -274,136 +274,298 @@ Actor.main(async () => {
         await page.waitForTimeout(2000);
 
         // Extract all listings data
-        const listings = await page.evaluate(() => {
+        const listings = await page.evaluate((pageUrl) => {
             console.log('Starting listing extraction...');
             
-            const listingSelectors = [
-                '.listing-item',
-                '.property-item',
-                '.property-card',
-                '[class*="listing"]',
-                '[class*="property"]',
-                '.grid > div',
-                '[class*="grid"] > div',
-                '.card',
-                '[class*="card"]',
-                'div:has(img)',
-                'article:has(img)',
-                'section:has(img)'
-            ];
+            // Based on the screenshot, listings appear to be individual cards
+            // Look for containers that have an image AND property details
+            const results = [];
+            
+            // First, try to find the container that holds all listings
+            const possibleContainers = document.querySelectorAll('.grid, [class*="grid"], [class*="listings"], [class*="properties"]');
             
             let listingElements = [];
-            for (const selector of listingSelectors) {
-                try {
-                    const elements = document.querySelectorAll(selector);
-                    console.log(`Selector ${selector} found ${elements.length} elements`);
-                    if (elements.length > 0) {
-                        listingElements = elements;
-                        console.log(`Using selector ${selector} with ${elements.length} listings`);
-                        break;
-                    }
-                } catch (e) {
-                    console.log(`Selector ${selector} failed:`, e);
-                }
-            }
             
+            // Look for individual listing cards
+            possibleContainers.forEach(container => {
+                // Find elements within this container that look like individual listings
+                const cards = container.querySelectorAll(':scope > div, :scope > article, :scope > section');
+                if (cards.length > 0) {
+                    console.log(`Found ${cards.length} potential listing cards in container`);
+                    listingElements = cards;
+                }
+            });
+            
+            // If no container found, look for cards directly
             if (listingElements.length === 0) {
-                console.log('No listing elements found with specific selectors, trying general approach...');
-                
-                const allElements = document.querySelectorAll('div, article, section');
+                // Look for divs that contain both an image and price
+                const allDivs = document.querySelectorAll('div');
                 const potentialListings = [];
                 
-                allElements.forEach(element => {
-                    const text = element.textContent || '';
-                    if (text.includes('$') && 
-                        (text.includes('SQFT') || text.includes('BEDS') || text.includes('BATHS')) &&
-                        text.match(/\d+\s+\w+/)) {
-                        
-                        const hasChildListing = Array.from(element.querySelectorAll('*')).some(child => {
-                            const childText = child.textContent || '';
-                            return childText.includes('$') && childText.includes('SQFT');
+                allDivs.forEach(div => {
+                    const hasImage = div.querySelector('img');
+                    const text = div.textContent || '';
+                    const hasPrice = text.includes('
+
+        log.info(`Extracted ${listings.length} listings`);
+
+        if (listings.length > 0) {
+            await Actor.pushData(listings);
+            log.info('Successfully stored listings in dataset');
+        } else {
+            log.warning('No listings found - page structure may have changed');
+            
+            const screenshot = await page.screenshot({ fullPage: true });
+            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
+            log.info('Saved debug screenshot to key-value store');
+            
+            const html = await page.content();
+            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
+            log.info('Saved page HTML to key-value store');
+        }
+
+    } catch (error) {
+        log.error('Error during scraping:', error);
+        throw error;
+    } finally {
+        await browser.close();
+    }
+});
+
+function getRandomUserAgent() {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}) && text.match(/\$[\d,]+/);
+                    const hasDetails = text.includes('BATHS') && text.includes('BEDS') && text.includes('SQFT');
+                    
+                    if (hasImage && hasPrice && hasDetails) {
+                        // Make sure this isn't a parent container
+                        const childrenWithPrice = div.querySelectorAll(':scope div');
+                        let isParent = false;
+                        childrenWithPrice.forEach(child => {
+                            if (child !== div && child.textContent.includes('
+
+        log.info(`Extracted ${listings.length} listings`);
+
+        if (listings.length > 0) {
+            await Actor.pushData(listings);
+            log.info('Successfully stored listings in dataset');
+        } else {
+            log.warning('No listings found - page structure may have changed');
+            
+            const screenshot = await page.screenshot({ fullPage: true });
+            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
+            log.info('Saved debug screenshot to key-value store');
+            
+            const html = await page.content();
+            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
+            log.info('Saved page HTML to key-value store');
+        }
+
+    } catch (error) {
+        log.error('Error during scraping:', error);
+        throw error;
+    } finally {
+        await browser.close();
+    }
+});
+
+function getRandomUserAgent() {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}) && child.textContent.includes('SQFT')) {
+                                isParent = true;
+                            }
                         });
                         
-                        if (!hasChildListing) {
-                            potentialListings.push(element);
+                        if (!isParent) {
+                            potentialListings.push(div);
                         }
                     }
                 });
                 
-                listingElements = potentialListings;
-                console.log(`Found ${listingElements.length} potential listings using general approach`);
+                // Remove duplicates and nested elements
+                listingElements = potentialListings.filter((el, index) => {
+                    // Check if this element is contained within another potential listing
+                    for (let i = 0; i < potentialListings.length; i++) {
+                        if (i !== index && potentialListings[i].contains(el)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+                
+                console.log(`Found ${listingElements.length} individual listing cards`);
             }
             
-            const results = [];
-            
-            listingElements.forEach((listing) => {
+            listingElements.forEach((listing, index) => {
                 try {
-                    let title = '';
-                    const titleSelectors = ['h3', 'h4', '[class*="address"]', '[class*="title"]', '[class*="street"]', 'a'];
+                    console.log(`Processing listing ${index + 1}`);
                     
-                    for (const selector of titleSelectors) {
-                        const element = listing.querySelector(selector);
-                        if (element && element.textContent) {
-                            const text = element.textContent.trim();
-                            if (text.match(/^\d+\s+\w+/) || text.length > 5) {
-                                title = text;
-                                break;
-                            }
+                    // Extract address/title - usually in h3, h4, or a prominent text element
+                    let title = '';
+                    const possibleTitleElements = listing.querySelectorAll('h1, h2, h3, h4, h5, [class*="address"], [class*="title"]');
+                    possibleTitleElements.forEach(el => {
+                        const text = (el.textContent || '').trim();
+                        // Look for address pattern (number followed by street name)
+                        if (text.match(/^\d+\s+\w+/) && text.length > title.length) {
+                            title = text;
                         }
-                    }
+                    });
+                    
+                    // If no title found with headers, look for any text with address pattern
+                    if (!title) {
+                        const allTexts = listing.querySelectorAll('*');
+                        allTexts.forEach(el => {
+                            const text = (el.textContent || '').trim();
+                            if (text.match(/^\d+\s+\w+\s+\w+/) && !text.includes('
 
+        log.info(`Extracted ${listings.length} listings`);
+
+        if (listings.length > 0) {
+            await Actor.pushData(listings);
+            log.info('Successfully stored listings in dataset');
+        } else {
+            log.warning('No listings found - page structure may have changed');
+            
+            const screenshot = await page.screenshot({ fullPage: true });
+            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
+            log.info('Saved debug screenshot to key-value store');
+            
+            const html = await page.content();
+            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
+            log.info('Saved page HTML to key-value store');
+        }
+
+    } catch (error) {
+        log.error('Error during scraping:', error);
+        throw error;
+    } finally {
+        await browser.close();
+    }
+});
+
+function getRandomUserAgent() {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}) && !text.includes('SQFT')) {
+                                title = text;
+                            }
+                        });
+                    }
+                    
+                    // Extract price - look for dollar sign
                     let price = '';
                     const priceElements = listing.querySelectorAll('*');
-                    for (const el of priceElements) {
-                        const text = el.textContent || '';
-                        if (text.includes('$') && text.match(/\$[\d,]+/)) {
-                            price = text.match(/\$[\d,]+/)[0];
-                            break;
+                    priceElements.forEach(el => {
+                        const text = (el.textContent || '').trim();
+                        const priceMatch = text.match(/^\$[\d,]+$/);
+                        if (priceMatch) {
+                            price = priceMatch[0];
                         }
-                    }
-
-                    let sqft = '';
-                    const sqftElement = Array.from(listing.querySelectorAll('*')).find(el => 
-                        el.textContent && el.textContent.includes('SQFT')
-                    );
-                    if (sqftElement) {
-                        const match = sqftElement.textContent.match(/([\d,]+)\s*SQFT/i);
-                        if (match) sqft = match[1];
-                    }
-
-                    let beds = 0;
-                    const bedsElement = Array.from(listing.querySelectorAll('*')).find(el => 
-                        el.textContent && el.textContent.includes('BEDS')
-                    );
-                    if (bedsElement) {
-                        const match = bedsElement.textContent.match(/(\d+)\s*BEDS/i);
-                        if (match) beds = parseInt(match[1]);
-                    }
-
+                    });
+                    
+                    // Extract BATHS
                     let baths = 0;
-                    const bathsElement = Array.from(listing.querySelectorAll('*')).find(el => 
-                        el.textContent && el.textContent.includes('BATHS')
-                    );
-                    if (bathsElement) {
-                        const match = bathsElement.textContent.match(/([\d.]+)\s*BATHS/i);
-                        if (match) baths = parseFloat(match[1]);
-                    }
-
+                    const bathElements = listing.querySelectorAll('*');
+                    bathElements.forEach(el => {
+                        const text = (el.textContent || '').trim();
+                        if (text === 'BATHS') {
+                            // Look for the number in a sibling or parent element
+                            const parent = el.parentElement;
+                            if (parent) {
+                                const parentText = parent.textContent || '';
+                                const bathMatch = parentText.match(/(\d+\.?\d*)\s*BATHS/);
+                                if (bathMatch) {
+                                    baths = parseFloat(bathMatch[1]);
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Extract BEDS
+                    let beds = 0;
+                    const bedElements = listing.querySelectorAll('*');
+                    bedElements.forEach(el => {
+                        const text = (el.textContent || '').trim();
+                        if (text === 'BEDS') {
+                            // Look for the number in a sibling or parent element
+                            const parent = el.parentElement;
+                            if (parent) {
+                                const parentText = parent.textContent || '';
+                                const bedMatch = parentText.match(/(\d+)\s*BEDS/);
+                                if (bedMatch) {
+                                    beds = parseInt(bedMatch[1]);
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Extract SQFT
+                    let sqft = '';
+                    const sqftElements = listing.querySelectorAll('*');
+                    sqftElements.forEach(el => {
+                        const text = (el.textContent || '').trim();
+                        if (text === 'SQFT') {
+                            // Look for the number in a sibling or parent element
+                            const parent = el.parentElement;
+                            if (parent) {
+                                const parentText = parent.textContent || '';
+                                const sqftMatch = parentText.match(/([\d,]+)\s*SQFT/);
+                                if (sqftMatch) {
+                                    sqft = sqftMatch[1];
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Extract images
                     const imageElements = listing.querySelectorAll('img[src], img[data-src], img[data-lazy-src]');
                     const images = Array.from(imageElements)
-                        .map(img => img.src || img.dataset.src || img.dataset.lazySrc)
+                        .map(img => {
+                            const src = img.src || img.dataset.src || img.dataset.lazySrc || '';
+                            // Make sure it's an absolute URL
+                            if (src.startsWith('http')) {
+                                return src;
+                            } else if (src.startsWith('/')) {
+                                return window.location.origin + src;
+                            }
+                            return src;
+                        })
                         .filter(src => src && !src.includes('placeholder') && !src.includes('logo'))
-                        .slice(0, 5);
-
-                    const linkElement = listing.querySelector('a[href]');
+                        .slice(0, 1); // Usually one main image per listing card
+                    
+                    // Extract listing URL - look for main link
                     let listingUrl = '';
+                    const linkElement = listing.querySelector('a[href]');
                     if (linkElement) {
                         listingUrl = linkElement.href;
                         if (listingUrl.startsWith('/')) {
                             listingUrl = window.location.origin + listingUrl;
                         }
                     }
-
+                    
+                    console.log(`Listing ${index + 1}: ${title} - ${price} - ${beds} beds, ${baths} baths, ${sqft} sqft`);
+                    
+                    // Only add if we have meaningful data
                     if (title && (price || sqft || beds)) {
                         results.push({
                             title,
@@ -412,7 +574,7 @@ Actor.main(async () => {
                             beds,
                             baths,
                             images,
-                            listingUrl,
+                            listingUrl: listingUrl || pageUrl,
                             agent: 'Brandon Hooley',
                             timestamp: new Date().toISOString()
                         });
@@ -421,9 +583,10 @@ Actor.main(async () => {
                     console.error('Error extracting listing:', error);
                 }
             });
-
+            
+            console.log(`Successfully extracted ${results.length} unique listings`);
             return results;
-        });
+        }, targetUrl);
 
         log.info(`Extracted ${listings.length} listings`);
 
