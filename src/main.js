@@ -5,12 +5,15 @@ Actor.main(async () => {
     // Get input configuration
     const input = await Actor.getInput() || {};
     const {
-        targetUrl = 'https://www.hershenberggroup.com/team/brandon-hooley',
+        startUrls = [{ url: 'https://www.hershenberggroup.com/team/brandon-hooley' }],
         maxRetries = 3,
         scrollDelay = 1500,
         useProxy = true,
         proxyConfiguration
     } = input;
+
+    // Extract the URL from the startUrls array
+    const targetUrl = startUrls[0]?.url || 'https://www.hershenberggroup.com/team/brandon-hooley';
 
     log.info('Starting Hershenberg Group listings scraper', { targetUrl });
 
@@ -44,9 +47,6 @@ Actor.main(async () => {
             locale: 'en-US',
             timezoneId: 'America/New_York',
             permissions: [],
-            geolocation: null,
-            offline: false,
-            httpCredentials: null,
             deviceScaleFactor: 1,
             isMobile: false,
             hasTouch: false,
