@@ -1,5 +1,5 @@
-# Use Apify SDK Docker image
-FROM apify/actor-node-playwright-chrome:18
+# Use Apify SDK Docker image with Playwright
+FROM apify/actor-node-playwright-chrome:18-beta
 
 # Copy source code
 COPY package*.json ./
