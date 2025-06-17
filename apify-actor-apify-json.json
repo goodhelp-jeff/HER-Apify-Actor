@@ -1,0 +1,64 @@
+{
+  "name": "hershenberg-group-listings-scraper",
+  "version": "1.0.0",
+  "buildTag": "latest",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "defaultRunOptions": {
+    "build": "latest",
+    "timeoutSecs": 300,
+    "memoryMbytes": 1024
+  },
+  "dockerfile": "./Dockerfile",
+  "readme": "./README.md",
+  "input": "./input_schema.json",
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "title": "Real Estate Listings",
+      "views": {
+        "listings": {
+          "title": "All Listings",
+          "transformation": {
+            "fields": [
+              "title",
+              "price",
+              "sqft",
+              "beds",
+              "baths",
+              "listingUrl",
+              "agent",
+              "timestamp"
+            ]
+          },
+          "display": {
+            "component": "table",
+            "properties": {
+              "title": {
+                "label": "Property",
+                "format": "text"
+              },
+              "price": {
+                "label": "Price",
+                "format": "text"
+              },
+              "sqft": {
+                "label": "Sq Ft",
+                "format": "number"
+              },
+              "beds": {
+                "label": "Beds",
+                "format": "number"
+              },
+              "baths": {
+                "label": "Baths",
+                "format": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

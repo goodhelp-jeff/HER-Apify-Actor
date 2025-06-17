@@ -1,0 +1,46 @@
+{
+  "title": "Hershenberg Group Listings Scraper Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "targetUrl": {
+      "title": "Target URL",
+      "type": "string",
+      "description": "The URL of the agent page to scrape",
+      "editor": "textfield",
+      "prefill": "https://www.hershenberggroup.com/team/brandon-hooley",
+      "default": "https://www.hershenberggroup.com/team/brandon-hooley"
+    },
+    "maxRetries": {
+      "title": "Max Retries",
+      "type": "integer",
+      "description": "Maximum number of retries for failed selectors",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 3
+    },
+    "scrollDelay": {
+      "title": "Scroll Delay (ms)",
+      "type": "integer",
+      "description": "Delay in milliseconds between scroll actions",
+      "minimum": 500,
+      "maximum": 5000,
+      "default": 1500
+    },
+    "useProxy": {
+      "title": "Use Proxy",
+      "type": "boolean",
+      "description": "Enable Apify residential proxy",
+      "default": true
+    },
+    "proxyConfiguration": {
+      "title": "Proxy configuration",
+      "type": "object",
+      "description": "Proxy configuration",
+      "editor": "proxy",
+      "sectionCaption": "Proxy configuration",
+      "sectionDescription": "Configure proxy settings"
+    }
+  },
+  "required": ["targetUrl"]
+}
