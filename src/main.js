@@ -204,9 +204,10 @@ Actor.main(async () => {
         const seeMoreSelectors = [
             'button:has-text("SEE MORE LISTINGS")',
             'a:has-text("SEE MORE LISTINGS")',
-            'button:text-is("SEE MORE LISTINGS")',
+            'button.see-more-listings',
+            '[class*="see-more"]',
             'text="SEE MORE LISTINGS"',
-            ':has-text("SEE MORE LISTINGS")'
+            '//button[text()="SEE MORE LISTINGS"]'
         ];
 
         while (hasMoreListings) {
@@ -277,181 +278,243 @@ Actor.main(async () => {
         const listings = await page.evaluate((pageUrl) => {
             console.log('Starting listing extraction...');
             
-            // Based on the screenshot, listings appear to be individual cards
             const results = [];
             
-            // First, try to find the container that holds all listings
-            const possibleContainers = document.querySelectorAll('.grid, [class*="grid"], [class*="listings"], [class*="properties"]');
+            // Look for listing cards - they appear to be in a grid layout
+            // Try multiple selectors based on common patterns
+            const cardSelectors = [
+                '.listing-card',
+                '.property-card',
+                '[class*="listing"]',
+                '[class*="property"]',
+                '.grid > div',
+                '[class*="grid"] > div'
+            ];
             
             let listingElements = [];
             
-            // Look for individual listing cards
-            possibleContainers.forEach(container => {
-                const cards = container.querySelectorAll(':scope > div, :scope > article, :scope > section');
-                if (cards.length > 0) {
-                    console.log(`Found ${cards.length} potential listing cards in container`);
-                    listingElements = cards;
-                }
-            });
+            // Try each selector to find listing cards
+            for (const selector of cardSelectors) {
+                const elements = document.querySelectorAll(selector);
+                if (elements.length > 2) { // Expect multiple listings
+                    console.log(`Found ${elements.length} elements with selector: ${selector}`);
+                    
+                    // Verify these are listing cards by checking for price
+                    const validCards = Array.from(elements).filter(el => {
+                        const text = el.textContent || '';
+                        return text.includes('
+
+        log.info(`Extracted ${listings.length} listings`);
+
+        if (listings.length > 0) {
+            await Actor.pushData(listings);
+            log.info('Successfully stored listings in dataset');
+        } else {
+            log.warning('No listings found - page structure may have changed');
             
-            // If no container found, look for cards directly
+            const screenshot = await page.screenshot({ fullPage: true });
+            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
+            log.info('Saved debug screenshot to key-value store');
+            
+            const html = await page.content();
+            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
+            log.info('Saved page HTML to key-value store');
+        }
+
+    } catch (error) {
+        log.error('Error during scraping:', error);
+        throw error;
+    } finally {
+        await browser.close();
+    }
+});
+
+function getRandomUserAgent() {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}) && text.match(/\$[\d,]+/);
+                    });
+                    
+                    if (validCards.length > 0) {
+                        listingElements = validCards;
+                        console.log(`Using ${validCards.length} valid listing cards`);
+                        break;
+                    }
+                }
+            }
+            
+            // If no cards found with selectors, look for pattern
             if (listingElements.length === 0) {
+                console.log('No cards found with selectors, trying pattern matching...');
+                
+                // Look for divs that contain price and "Listed X Days Ago"
                 const allDivs = document.querySelectorAll('div');
-                const potentialListings = [];
+                const potentialCards = [];
                 
                 allDivs.forEach(div => {
-                    const hasImage = div.querySelector('img');
                     const text = div.textContent || '';
-                    const hasPrice = text.includes('$') && text.match(/\$[\d,]+/);
-                    const hasDetails = text.includes('BATHS') && text.includes('BEDS') && text.includes('SQFT');
+                    const hasPrice = text.match(/\$[\d,]+/);
+                    const hasListedText = text.includes('Listed') && text.includes('Day');
+                    const hasImage = div.querySelector('img');
                     
-                    if (hasImage && hasPrice && hasDetails) {
-                        // Make sure this isn't a parent container
-                        const childrenWithPrice = div.querySelectorAll(':scope div');
-                        let isParent = false;
-                        childrenWithPrice.forEach(child => {
-                            if (child !== div && child.textContent && child.textContent.includes('$') && child.textContent.includes('SQFT')) {
-                                isParent = true;
+                    if (hasPrice && hasListedText && hasImage) {
+                        // Make sure it's not a parent container
+                        const priceElements = div.querySelectorAll('*');
+                        let priceCount = 0;
+                        priceElements.forEach(el => {
+                            if (el.textContent && el.textContent.match(/\$[\d,]+/)) {
+                                priceCount++;
                             }
                         });
                         
-                        if (!isParent) {
-                            potentialListings.push(div);
+                        // If only one price element, it's likely a single listing
+                        if (priceCount === 1) {
+                            potentialCards.push(div);
                         }
                     }
                 });
                 
-                // Remove duplicates and nested elements
-                listingElements = potentialListings.filter((el, index) => {
-                    for (let i = 0; i < potentialListings.length; i++) {
-                        if (i !== index && potentialListings[i].contains(el)) {
+                // Remove nested cards
+                listingElements = potentialCards.filter((card, index) => {
+                    for (let i = 0; i < potentialCards.length; i++) {
+                        if (i !== index && potentialCards[i].contains(card)) {
                             return false;
                         }
                     }
                     return true;
                 });
                 
-                console.log(`Found ${listingElements.length} individual listing cards`);
+                console.log(`Found ${listingElements.length} listing cards by pattern`);
             }
             
-            listingElements.forEach((listing, index) => {
+            // Extract data from each listing card
+            listingElements.forEach((card, index) => {
                 try {
                     console.log(`Processing listing ${index + 1}`);
                     
-                    // Extract address/title
+                    // Extract address - usually the first text that looks like an address
                     let title = '';
-                    const possibleTitleElements = listing.querySelectorAll('h1, h2, h3, h4, h5, [class*="address"], [class*="title"]');
-                    possibleTitleElements.forEach(el => {
+                    const textElements = card.querySelectorAll('*');
+                    textElements.forEach(el => {
                         const text = (el.textContent || '').trim();
-                        if (text.match(/^\d+\s+\w+/) && text.length > title.length) {
-                            title = text;
-                        }
-                    });
-                    
-                    if (!title) {
-                        const allTexts = listing.querySelectorAll('*');
-                        allTexts.forEach(el => {
-                            const text = (el.textContent || '').trim();
-                            if (text.match(/^\d+\s+\w+\s+\w+/) && !text.includes('$') && !text.includes('SQFT')) {
+                        // Match address pattern: number + street name
+                        if (text.match(/^\d+\s+\w+/) && !text.includes('
+
+        log.info(`Extracted ${listings.length} listings`);
+
+        if (listings.length > 0) {
+            await Actor.pushData(listings);
+            log.info('Successfully stored listings in dataset');
+        } else {
+            log.warning('No listings found - page structure may have changed');
+            
+            const screenshot = await page.screenshot({ fullPage: true });
+            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
+            log.info('Saved debug screenshot to key-value store');
+            
+            const html = await page.content();
+            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
+            log.info('Saved page HTML to key-value store');
+        }
+
+    } catch (error) {
+        log.error('Error during scraping:', error);
+        throw error;
+    } finally {
+        await browser.close();
+    }
+});
+
+function getRandomUserAgent() {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}) && !text.includes('Listed')) {
+                            if (!title || text.length > title.length) {
                                 title = text;
                             }
-                        });
-                    }
+                        }
+                    });
                     
                     // Extract price
                     let price = '';
-                    const priceElements = listing.querySelectorAll('*');
-                    priceElements.forEach(el => {
+                    const pricePattern = /\$[\d,]+/;
+                    textElements.forEach(el => {
                         const text = (el.textContent || '').trim();
-                        const priceMatch = text.match(/^\$[\d,]+$/);
-                        if (priceMatch) {
-                            price = priceMatch[0];
+                        if (text.match(/^\$[\d,]+$/)) {
+                            price = text;
                         }
                     });
                     
-                    // Extract BATHS
-                    let baths = 0;
-                    const bathElements = listing.querySelectorAll('*');
-                    bathElements.forEach(el => {
-                        const text = (el.textContent || '').trim();
-                        if (text === 'BATHS') {
-                            const parent = el.parentElement;
-                            if (parent) {
-                                const parentText = parent.textContent || '';
-                                const bathMatch = parentText.match(/(\d+\.?\d*)\s*BATHS/);
-                                if (bathMatch) {
-                                    baths = parseFloat(bathMatch[1]);
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Extract BEDS
+                    // Extract property details (beds, baths, sqft)
+                    // Looking for patterns with icons or numbers
                     let beds = 0;
-                    const bedElements = listing.querySelectorAll('*');
-                    bedElements.forEach(el => {
-                        const text = (el.textContent || '').trim();
-                        if (text === 'BEDS') {
-                            const parent = el.parentElement;
-                            if (parent) {
-                                const parentText = parent.textContent || '';
-                                const bedMatch = parentText.match(/(\d+)\s*BEDS/);
-                                if (bedMatch) {
-                                    beds = parseInt(bedMatch[1]);
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Extract SQFT
+                    let baths = 0;
                     let sqft = '';
-                    const sqftElements = listing.querySelectorAll('*');
-                    sqftElements.forEach(el => {
+                    
+                    // Look for elements with property details
+                    const detailElements = card.querySelectorAll('*');
+                    detailElements.forEach(el => {
                         const text = (el.textContent || '').trim();
-                        if (text === 'SQFT') {
+                        
+                        // Try to find beds (look for patterns like "3" near bed icon)
+                        if (text.match(/^\d+$/) && parseInt(text) <= 10) {
                             const parent = el.parentElement;
                             if (parent) {
-                                const parentText = parent.textContent || '';
-                                const sqftMatch = parentText.match(/([\d,]+)\s*SQFT/);
-                                if (sqftMatch) {
-                                    sqft = sqftMatch[1];
+                                const siblingText = parent.textContent || '';
+                                // Check if this number is near other property numbers
+                                if (siblingText.match(/\d+.*\d+.*[\d,]+/)) {
+                                    // This is likely beds or baths
+                                    const num = parseInt(text);
+                                    if (beds === 0) beds = num;
+                                    else if (baths === 0) baths = num;
                                 }
+                            }
+                        }
+                        
+                        // Look for square footage (larger numbers, often with commas)
+                        if (text.match(/^[\d,]+$/) && text.length >= 3) {
+                            const num = parseInt(text.replace(/,/g, ''));
+                            if (num > 100 && num < 10000) {
+                                sqft = text;
                             }
                         }
                     });
                     
-                    // Extract images
-                    const imageElements = listing.querySelectorAll('img[src], img[data-src], img[data-lazy-src]');
-                    const images = Array.from(imageElements)
-                        .map(img => {
-                            const src = img.src || img.dataset.src || img.dataset.lazySrc || '';
-                            if (src.startsWith('http')) {
-                                return src;
-                            } else if (src.startsWith('/')) {
-                                return window.location.origin + src;
-                            }
-                            return src;
-                        })
-                        .filter(src => src && !src.includes('placeholder') && !src.includes('logo'))
-                        .slice(0, 1);
+                    // Extract image
+                    const images = [];
+                    const img = card.querySelector('img');
+                    if (img && img.src) {
+                        images.push(img.src);
+                    }
                     
                     // Extract listing URL
                     let listingUrl = '';
-                    const linkElement = listing.querySelector('a[href]');
-                    if (linkElement) {
-                        listingUrl = linkElement.href;
+                    const link = card.querySelector('a[href]');
+                    if (link) {
+                        listingUrl = link.href;
                         if (listingUrl.startsWith('/')) {
                             listingUrl = window.location.origin + listingUrl;
                         }
                     }
                     
-                    console.log(`Listing ${index + 1}: ${title} - ${price} - ${beds} beds, ${baths} baths, ${sqft} sqft`);
+                    console.log(`Found: ${title} - ${price} - ${beds}bd/${baths}ba - ${sqft}sqft`);
                     
-                    // Only add if we have meaningful data
-                    if (title && (price || sqft || beds)) {
+                    if (title && price) {
                         results.push({
                             title,
-                            price: price || 'Contact for price',
+                            price,
                             sqft: sqft || 'N/A',
                             beds,
                             baths,
@@ -462,11 +525,11 @@ Actor.main(async () => {
                         });
                     }
                 } catch (error) {
-                    console.error('Error extracting listing:', error);
+                    console.error(`Error processing listing ${index + 1}:`, error);
                 }
             });
             
-            console.log(`Successfully extracted ${results.length} unique listings`);
+            console.log(`Extracted ${results.length} listings total`);
             return results;
         }, targetUrl);
 
