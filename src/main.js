@@ -206,8 +206,7 @@ Actor.main(async () => {
             'a:has-text("SEE MORE LISTINGS")',
             'button.see-more-listings',
             '[class*="see-more"]',
-            'text="SEE MORE LISTINGS"',
-            '//button[text()="SEE MORE LISTINGS"]'
+            'text="SEE MORE LISTINGS"'
         ];
 
         while (hasMoreListings) {
@@ -280,8 +279,7 @@ Actor.main(async () => {
             
             const results = [];
             
-            // Look for listing cards - they appear to be in a grid layout
-            // Try multiple selectors based on common patterns
+            // Look for listing cards
             const cardSelectors = [
                 '.listing-card',
                 '.property-card',
@@ -296,49 +294,13 @@ Actor.main(async () => {
             // Try each selector to find listing cards
             for (const selector of cardSelectors) {
                 const elements = document.querySelectorAll(selector);
-                if (elements.length > 2) { // Expect multiple listings
+                if (elements.length > 2) {
                     console.log(`Found ${elements.length} elements with selector: ${selector}`);
                     
                     // Verify these are listing cards by checking for price
                     const validCards = Array.from(elements).filter(el => {
                         const text = el.textContent || '';
-                        return text.includes('
-
-        log.info(`Extracted ${listings.length} listings`);
-
-        if (listings.length > 0) {
-            await Actor.pushData(listings);
-            log.info('Successfully stored listings in dataset');
-        } else {
-            log.warning('No listings found - page structure may have changed');
-            
-            const screenshot = await page.screenshot({ fullPage: true });
-            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
-            log.info('Saved debug screenshot to key-value store');
-            
-            const html = await page.content();
-            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
-            log.info('Saved page HTML to key-value store');
-        }
-
-    } catch (error) {
-        log.error('Error during scraping:', error);
-        throw error;
-    } finally {
-        await browser.close();
-    }
-});
-
-function getRandomUserAgent() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-}) && text.match(/\$[\d,]+/);
+                        return text.includes('$') && text.match(/\$[\d,]+/);
                     });
                     
                     if (validCards.length > 0) {
@@ -398,49 +360,13 @@ function getRandomUserAgent() {
                 try {
                     console.log(`Processing listing ${index + 1}`);
                     
-                    // Extract address - usually the first text that looks like an address
+                    // Extract address
                     let title = '';
                     const textElements = card.querySelectorAll('*');
                     textElements.forEach(el => {
                         const text = (el.textContent || '').trim();
                         // Match address pattern: number + street name
-                        if (text.match(/^\d+\s+\w+/) && !text.includes('
-
-        log.info(`Extracted ${listings.length} listings`);
-
-        if (listings.length > 0) {
-            await Actor.pushData(listings);
-            log.info('Successfully stored listings in dataset');
-        } else {
-            log.warning('No listings found - page structure may have changed');
-            
-            const screenshot = await page.screenshot({ fullPage: true });
-            await Actor.setValue('debug-screenshot', screenshot, { contentType: 'image/png' });
-            log.info('Saved debug screenshot to key-value store');
-            
-            const html = await page.content();
-            await Actor.setValue('debug-html', html, { contentType: 'text/html' });
-            log.info('Saved page HTML to key-value store');
-        }
-
-    } catch (error) {
-        log.error('Error during scraping:', error);
-        throw error;
-    } finally {
-        await browser.close();
-    }
-});
-
-function getRandomUserAgent() {
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-}) && !text.includes('Listed')) {
+                        if (text.match(/^\d+\s+\w+/) && !text.includes('$') && !text.includes('Listed')) {
                             if (!title || text.length > title.length) {
                                 title = text;
                             }
@@ -449,7 +375,6 @@ function getRandomUserAgent() {
                     
                     // Extract price
                     let price = '';
-                    const pricePattern = /\$[\d,]+/;
                     textElements.forEach(el => {
                         const text = (el.textContent || '').trim();
                         if (text.match(/^\$[\d,]+$/)) {
@@ -458,7 +383,6 @@ function getRandomUserAgent() {
                     });
                     
                     // Extract property details (beds, baths, sqft)
-                    // Looking for patterns with icons or numbers
                     let beds = 0;
                     let baths = 0;
                     let sqft = '';
