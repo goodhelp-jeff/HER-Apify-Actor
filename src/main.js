@@ -53,47 +53,85 @@ Actor.main(async () => {
         // Simple extraction - just get all text that looks like listings
         const listings = await page.evaluate(() => {
             const results = [];
-            
-            // Find all elements with prices
-            const priceElements = document.querySelectorAll('*');
             const seen = new Set();
             
-            priceElements.forEach(el => {
+            // Find all elements that contain ONLY a price (no children with prices)
+            const priceElements = [];
+            document.querySelectorAll('*').forEach(el => {
                 const text = el.textContent || '';
-                if (text.match(/\$[\d,]+/) && !el.querySelector('*')) {
-                    // This element directly contains a price
-                    const price = text.trim();
-                    
-                    // Walk up to find container
-                    let container = el.parentElement;
-                    while (container && !container.querySelector('img')) {
-                        container = container.parentElement;
+                const hasPrice = text.match(/^\$[\d,]+$/);
+                const hasChildWithPrice = el.querySelector('*') && Array.from(el.querySelectorAll('*')).some(
+                    child => child.textContent && child.textContent.match(/^\$[\d,]+$/)
+                );
+                
+                if (hasPrice && !hasChildWithPrice) {
+                    priceElements.push(el);
+                }
+            });
+            
+            priceElements.forEach(priceEl => {
+                const price = priceEl.textContent.trim();
+                
+                // Walk up to find the listing container
+                let container = priceEl.parentElement;
+                let depth = 0;
+                while (container && depth < 10) {
+                    // Stop if we find an image (likely the listing card)
+                    if (container.querySelector('img')) {
+                        break;
                     }
-                    
-                    if (container) {
-                        const fullText = container.textContent;
-                        
-                        // Extract address (simple approach)
-                        const match = fullText.match(/(\d+\s+[A-Za-z\s]+)(Flower Mound|Bartonville)/);
-                        const address = match ? match[1].trim() : 'Unknown';
-                        
-                        // Skip duplicates
-                        const key = address + price;
-                        if (seen.has(key)) return;
-                        seen.add(key);
-                        
-                        // Extract numbers
-                        const numbers = fullText.match(/\d+/g) || [];
-                        
-                        results.push({
-                            address: address,
-                            price: price,
-                            beds: numbers[1] || 0,
-                            baths: numbers[2] || 0, 
-                            sqft: numbers[3] || 'N/A',
-                            text: fullText.substring(0, 300)
-                        });
+                    container = container.parentElement;
+                    depth++;
+                }
+                
+                if (!container) return;
+                
+                const fullText = container.textContent;
+                
+                // Extract address more carefully
+                let address = 'Unknown';
+                const addressPatterns = [
+                    /(\d+\s+[A-Za-z\s]+(?:Drive|Lane|Court|Road|Way|Boulevard|Parkway|Circle|Place))/i,
+                    /(\d+\s+[A-Za-z\s]+)(?=Flower Mound|Bartonville)/
+                ];
+                
+                for (const pattern of addressPatterns) {
+                    const match = fullText.match(pattern);
+                    if (match) {
+                        address = match[1].trim();
+                        break;
                     }
+                }
+                
+                // Skip if we've seen this listing
+                const key = address + price;
+                if (seen.has(key)) return;
+                seen.add(key);
+                
+                // Extract beds/baths/sqft more carefully
+                let beds = 0, baths = 0, sqft = 'N/A';
+                
+                // Look for patterns like "3 Beds" or "Beds: 3"
+                const bedsMatch = fullText.match(/(\d+)\s*Bed|Bed[s]?\s*[:=]?\s*(\d+)/i);
+                if (bedsMatch) beds = parseInt(bedsMatch[1] || bedsMatch[2]) || 0;
+                
+                // Look for patterns like "2.5 Baths" or "Baths: 2.5"
+                const bathsMatch = fullText.match(/([\d.]+)\s*Bath|Bath[s]?\s*[:=]?\s*([\d.]+)/i);
+                if (bathsMatch) baths = parseFloat(bathsMatch[1] || bathsMatch[2]) || 0;
+                
+                // Look for patterns like "2,500 Sqft" or "Sqft: 2,500"
+                const sqftMatch = fullText.match(/([\d,]+)\s*(?:Sqft|Sq\s*Ft)|(?:Sqft|Sq\s*Ft)\s*[:=]?\s*([\d,]+)/i);
+                if (sqftMatch) sqft = (sqftMatch[1] || sqftMatch[2] || '').replace(/,/g, '');
+                
+                // Only add if we have a valid address
+                if (address !== 'Unknown' && !address.includes('function')) {
+                    results.push({
+                        address: address,
+                        price: price,
+                        beds: beds,
+                        baths: baths,
+                        sqft: sqft
+                    });
                 }
             });
             
